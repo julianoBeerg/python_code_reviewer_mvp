@@ -19,21 +19,24 @@ class LLMProvider:
         # Configura a API do Google
         genai.configure(api_key=self.api_key)
         
-        # Inicializa o modelo
-        # system_instruction é suportado a partir do gemini-1.5-pro e gemini-1.5-flash
+        # Inicializa o modelo com instruções de Auditor de Segurança
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
-            system_instruction="Você é um Arquiteto de Software Senior realizando um Code Review rigoroso e instrutivo."
+            system_instruction=(
+                "Você é um Auditor de Segurança e Arquiteto de Software Senior. "
+                "Sua missão é impedir que códigos com vulnerabilidades ou falhas de padrão sejam mesclados. "
+                "Seja extremamente rigoroso e crítico."
+            )
         )
 
     def generate_review(self, diff_data: str, context_data: str) -> str:
         """
-        Constrói o prompt e solicita a revisão ao Gemini.
+        Constrói o prompt e solicita a revisão ao Gemini com foco em segurança.
         """
         prompt = f"""
-Por favor, revise o código abaixo baseado no contexto fornecido.
+Você deve realizar um Code Review focado em SEGURANÇA e BOAS PRÁTICAS.
 
-CONTEXTO DO PROJETO (Regras e Padrões):
+CONTEXTO DO PROJETO:
 ---
 {context_data}
 ---
@@ -43,24 +46,29 @@ MUDANÇAS NO CÓDIGO (GIT DIFF):
 {diff_data}
 ---
 
-Instruções de Revisão:
-1. Verifique se o código respeita as regras e padrões arquiteturais definidos no CONTEXTO.
-2. Identifique potenciais bugs, problemas de segurança ou ineficiências de performance.
-3. Se houver problemas, você DEVE retornar a resposta EXATAMENTE no formato JSON abaixo:
+CHECKLIST DE REVISÃO (CRÍTICO):
+1. HARDCODED SECRETS: Verifique se há chaves de API, senhas, tokens ou 'Master Keys' escritas diretamente no código. Isso é PROIBIDO.
+2. INJECTION: Busque por SQL Injection ou comandos de shell que concatenam variáveis diretamente.
+3. PADRÕES: Verifique se o código segue as regras do CONTEXTO acima.
+4. BUGS: Identifique erros de lógica ou fluxos que podem quebrar em produção.
+
+FORMATO DE RESPOSTA (OBRIGATÓRIO JSON):
+Você deve retornar APENAS um JSON no formato abaixo. Se encontrar qualquer problema de segurança, status deve ser "CHANGES_REQUESTED".
+
 {{
-  "summary": "Resumo geral da revisão",
+  "summary": "Resumo crítico da revisão",
   "comments": [
     {{
-      "file": "nome_do_arquivo.py",
+      "file": "nome_do_arquivo.java",
       "line": 10,
-      "text": "Explicação detalhada do problema e sugestão"
+      "text": "🚨 ALERTA DE SEGURANÇA: [Explicação do erro e como corrigir usando variáveis de ambiente ou Vault]"
     }}
   ],
   "status": "APPROVED" ou "CHANGES_REQUESTED"
 }}
 
-4. Se o código estiver perfeito, use status "APPROVED" e deixe a lista de comments vazia.
-5. NÃO inclua blocos de código markdown (como ```json) na sua resposta, retorne APENAS o JSON puro.
+Se o código estiver 100% seguro e seguir os padrões, retorne status "APPROVED" e lista de comments vazia.
+NÃO use blocos de código ```json. Retorne o texto puro.
 """
         
         try:
