@@ -1,0 +1,7 @@
+google-generativeai>=0.4.0
+python-gitlab>=4.4.0
+PyGithub>=2.2.0
+python-dotenv>=1.0.0
+click>=8.1.7
+sentence-transformers>=2.5.1
+numpy>=1.26.0

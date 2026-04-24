@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Configurações
+.env
+
+# Índice do RAG (Base de Conhecimento Local)
+.index/
+
+# IDEs
+.vscode/
+.idea/
+
+# Outros
+*.log
+.DS_Store
