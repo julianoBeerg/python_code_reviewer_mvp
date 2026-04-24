@@ -55,12 +55,11 @@ class LLMProvider:
         """
         Tenta gerar a revisão usando uma lista de modelos de fallback.
         """
-        # Lista de modelos para tentar (do mais moderno para o mais compatível)
+        # Lista de modelos para tentar (baseado na sua lista de disponíveis de 2026)
         models_to_try = [
-            self.model_name,
+            "gemini-2.5-computer-use-preview-10-2025",
             "gemini-1.5-flash",
             "gemini-1.5-pro",
-            "gemini-2.0-flash-exp",
             "gemini-pro"
         ]
         
