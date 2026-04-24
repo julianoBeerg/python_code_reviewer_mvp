@@ -11,8 +11,8 @@ class LLMProvider:
     """
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        # Usando a versão -latest para garantir compatibilidade máxima
-        self.model_name = os.getenv("LLM_MODEL", "gemini-1.5-flash-latest")
+        # gemini-pro é o modelo mais compatível e evita erros 404 em versões antigas da SDK
+        self.model_name = os.getenv("LLM_MODEL", "gemini-pro")
         
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY não encontrada no arquivo .env")
