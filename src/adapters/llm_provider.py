@@ -30,23 +30,25 @@ class LLMProvider:
         except Exception as e:
             print(f"Erro ao listar modelos: {str(e)}")
 
-        # Guarda a instrução de sistema para usar nos fallbacks
+        # Guarda a instrução e config para usar nos fallbacks
         self.system_instruction_text = (
             "Você é um Auditor de Segurança rigoroso. "
             "Sua única tarefa é encontrar falhas, especialmente Hardcoded Secrets (chaves, senhas) e falhas de lógica. "
             "NÃO seja complacente. Se houver uma string fixa que parece uma chave, peça mudanças."
         )
+        
+        self.generation_config = {
+            "temperature": 0,
+            "top_p": 0.95,
+            "top_k": 64,
+            "max_output_tokens": 8192,
+        }
 
         # Inicializa o modelo base
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             system_instruction=self.system_instruction_text,
-            generation_config={
-                "temperature": 0,
-                "top_p": 0.95,
-                "top_k": 64,
-                "max_output_tokens": 8192,
-            }
+            generation_config=self.generation_config
         )
 
     def generate_review(self, diff_data: str, context_data: str) -> str:
@@ -70,7 +72,7 @@ class LLMProvider:
                 current_model = genai.GenerativeModel(
                     model_name=model_id,
                     system_instruction=self.system_instruction_text,
-                    generation_config=self.model.generation_config
+                    generation_config=self.generation_config
                 )
                 
                 prompt = f"""
