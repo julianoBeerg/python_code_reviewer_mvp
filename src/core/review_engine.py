@@ -43,14 +43,25 @@ class ReviewEngine:
         print("Enviando Diff + Contexto para a IA Revisora (Gemini)...")
         review_result = self.llm.generate_review(diff_text, context_data)
         
-        print("Revisão gerada pela IA (Raw JSON):")
+        print("Revisão gerada pela IA (Raw):")
         print("="*40)
         print(review_result)
         print("="*40)
         
+        # Limpa o resultado caso a IA tenha colocado blocos de código markdown
+        cleaned_result = review_result.strip()
+        if cleaned_result.startswith("```"):
+            # Remove as linhas de abertura e fechamento do bloco de código
+            lines = cleaned_result.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines[-1].startswith("```"):
+                lines = lines[:-1]
+            cleaned_result = "\n".join(lines).strip()
+
         # Tenta parsear o JSON retornado pela IA
         try:
-            review_json = json.loads(review_result)
+            review_json = json.loads(cleaned_result)
         except Exception as e:
             print(f"⚠️ Erro ao parsear JSON da IA. Postando como comentário simples. Erro: {str(e)}")
             review_json = None
@@ -60,10 +71,13 @@ class ReviewEngine:
             if review_json:
                 self.git_adapter.post_inline_comments(target_project, merge_request_id, review_json)
             else:
-                # Fallback se o JSON falhar
-                repo = self.git_adapter.gh.get_repo(target_project)
-                pr = repo.get_pull(merge_request_id)
-                pr.create_issue_comment(review_result)
+                # Fallback se o JSON falhar: posta o texto bruto como comentário geral
+                try:
+                    repo = self.git_adapter.gh.get_repo(target_project)
+                    pr = repo.get_pull(merge_request_id)
+                    pr.create_issue_comment(f"⚠️ A IA encontrou problemas, mas o formato da resposta falhou:\n\n{review_result}")
+                except Exception as ex:
+                    print(f"Erro ao postar fallback no GitHub: {str(ex)}")
         else:
             # GitLab ainda usa o formato antigo (ajustar depois se necessário)
             self.git_adapter.post_comment_on_mr(target_project, merge_request_id, review_result)
