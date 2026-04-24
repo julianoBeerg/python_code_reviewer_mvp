@@ -30,14 +30,17 @@ class LLMProvider:
         except Exception as e:
             print(f"Erro ao listar modelos: {str(e)}")
 
-        # Inicializa o modelo com instruções de Auditor de Segurança
+        # Guarda a instrução de sistema para usar nos fallbacks
+        self.system_instruction_text = (
+            "Você é um Auditor de Segurança rigoroso. "
+            "Sua única tarefa é encontrar falhas, especialmente Hardcoded Secrets (chaves, senhas) e falhas de lógica. "
+            "NÃO seja complacente. Se houver uma string fixa que parece uma chave, peça mudanças."
+        )
+
+        # Inicializa o modelo base
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
-            system_instruction=(
-                "Você é um Auditor de Segurança rigoroso. "
-                "Sua única tarefa é encontrar falhas, especialmente Hardcoded Secrets (chaves, senhas) e falhas de lógica. "
-                "NÃO seja complacente. Se houver uma string fixa que parece uma chave, peça mudanças."
-            ),
+            system_instruction=self.system_instruction_text,
             generation_config={
                 "temperature": 0,
                 "top_p": 0.95,
@@ -66,7 +69,7 @@ class LLMProvider:
                 print(f"🤖 Tentando revisão com o modelo: {model_id}...")
                 current_model = genai.GenerativeModel(
                     model_name=model_id,
-                    system_instruction=self.model.system_instruction,
+                    system_instruction=self.system_instruction_text,
                     generation_config=self.model.generation_config
                 )
                 
