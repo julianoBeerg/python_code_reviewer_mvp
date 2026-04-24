@@ -11,8 +11,8 @@ class LLMProvider:
     """
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        # Usando o modelo que apareceu na sua lista de disponíveis
-        self.model_name = os.getenv("LLM_MODEL", "gemini-2.5-computer-use-preview-10-2025")
+        # Tentando o modelo Deep Research que apareceu na sua lista
+        self.model_name = os.getenv("LLM_MODEL", "deep-research-preview-04-2026")
         
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY não encontrada no arquivo .env")
