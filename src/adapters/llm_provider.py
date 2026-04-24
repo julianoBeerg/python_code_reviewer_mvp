@@ -1,118 +1,62 @@
 import os
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class LLMProvider:
     """
-    Abstração para chamadas de LLM.
-    Configurado para usar Google Gemini (Plano Gratuito via AI Studio).
+    Abstração para chamadas de LLM usando a biblioteca moderna google-genai (2026).
     """
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        # Tentando o modelo Deep Research que apareceu na sua lista
-        self.model_name = os.getenv("LLM_MODEL", "deep-research-preview-04-2026")
-        
         if not self.api_key:
-            raise ValueError("GEMINI_API_KEY não encontrada no arquivo .env")
+            raise ValueError("GEMINI_API_KEY não encontrada")
             
-        # Configura a API do Google
-        genai.configure(api_key=self.api_key)
+        # Inicializa o cliente moderno
+        self.client = genai.Client(api_key=self.api_key)
         
-        # Diagnóstico: Listar modelos disponíveis
-        try:
-            print("--- MODELOS DISPONÍVEIS PARA ESTA CHAVE ---")
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    print(f"ID: {m.name}")
-            print("-------------------------------------------")
-        except Exception as e:
-            print(f"Erro ao listar modelos: {str(e)}")
-
-        # Guarda a instrução e config para usar nos fallbacks
-        self.system_instruction_text = (
+        # Modelo preferencial para 2026
+        self.model_name = os.getenv("LLM_MODEL", "gemini-2.0-flash")
+        
+        self.system_instruction = (
             "Você é um Auditor de Segurança rigoroso. "
-            "Sua única tarefa é encontrar falhas, especialmente Hardcoded Secrets (chaves, senhas) e falhas de lógica. "
-            "NÃO seja complacente. Se houver uma string fixa que parece uma chave, peça mudanças."
-        )
-        
-        self.generation_config = {
-            "temperature": 0,
-            "top_p": 0.95,
-            "top_k": 64,
-            "max_output_tokens": 8192,
-        }
-
-        # Inicializa o modelo base
-        self.model = genai.GenerativeModel(
-            model_name=self.model_name,
-            system_instruction=self.system_instruction_text,
-            generation_config=self.generation_config
+            "Sua única tarefa é encontrar falhas, especialmente Hardcoded Secrets e falhas de lógica. "
+            "Retorne APENAS um JSON puro, sem blocos de código markdown."
         )
 
     def generate_review(self, diff_data: str, context_data: str) -> str:
         """
-        Tenta gerar a revisão usando uma lista de modelos de fallback.
+        Tenta gerar a revisão usando a API moderna.
         """
-        # Lista de modelos para tentar (baseado na sua lista de disponíveis de 2026)
-        models_to_try = [
-            "gemini-2.5-computer-use-preview-10-2025",
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-            "gemini-pro"
-        ]
-        
-        last_error = ""
+        prompt = f"""
+CONTEXTO: {context_data}
+DIFF: {diff_data}
+
+FORMATO JSON:
+{{
+  "summary": "resumo",
+  "comments": [ {{"file": "x", "line": 1, "text": "y"}} ],
+  "status": "APPROVED" ou "CHANGES_REQUESTED"
+}}
+"""
+        # Lista de modelos para tentar em 2026
+        models_to_try = [self.model_name, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"]
         
         for model_id in models_to_try:
             try:
-                print(f"🤖 Tentando revisão com o modelo: {model_id}...")
-                current_model = genai.GenerativeModel(
-                    model_name=model_id,
-                    system_instruction=self.system_instruction_text,
-                    generation_config=self.generation_config
+                print(f"🤖 Tentando API Moderna com: {model_id}...")
+                response = self.client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config={
+                        "system_instruction": self.system_instruction,
+                        "temperature": 0
+                    }
                 )
-                
-                prompt = f"""
-Você deve realizar um Code Review focado em SEGURANÇA e BOAS PRÁTICAS.
-
-CONTEXTO DO PROJETO:
----
-{context_data}
----
-
-MUDANÇAS NO CÓDIGO (GIT DIFF):
----
-{diff_data}
----
-
-CHECKLIST DE REVISÃO (CRÍTICO):
-1. HARDCODED SECRETS: Verifique se há chaves de API, senhas, tokens ou 'Master Keys' escritas diretamente no código. Isso é PROIBIDO.
-2. INJECTION: Busque por SQL Injection ou comandos de shell que concatenam variáveis diretamente.
-3. PADRÕES: Verifique se o código segue as regras do CONTEXTO acima.
-4. BUGS: Identifique erros de lógica ou fluxos que podem quebrar em produção.
-
-FORMATO DE RESPOSTA (OBRIGATÓRIO JSON):
-{{
-  "summary": "Resumo crítico da revisão",
-  "comments": [
-    {{
-      "file": "nome_do_arquivo.java",
-      "line": 10,
-      "text": "🚨 ALERTA DE SEGURANÇA: [Explicação]"
-    }}
-  ],
-  "status": "APPROVED" ou "CHANGES_REQUESTED"
-}}
-APENAS JSON PURO.
-"""
-                response = current_model.generate_content(prompt)
                 return response.text.strip()
-                
             except Exception as e:
-                last_error = str(e)
-                print(f"⚠️ Falha com {model_id}: {last_error}")
+                print(f"⚠️ Falha com {model_id}: {str(e)}")
                 continue
                 
-        return f"Erro crítico: Nenhum dos modelos disponíveis ({models_to_try}) funcionou ou tem cota. Último erro: {last_error}"
+        return "Erro: Nenhum modelo disponível na API moderna."
