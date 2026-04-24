@@ -42,7 +42,7 @@ jobs:
       - name: Run AI Review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
           GITHUB_REPO: ${{ github.repository }}
         run: |
           export PYTHONPATH=$PYTHONPATH:$(pwd)/reviewer-tool

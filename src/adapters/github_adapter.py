@@ -9,9 +9,9 @@ class GitHubAdapter:
     Gerencia a comunicação com a API do GitHub.
     """
     def __init__(self):
-        token = os.getenv("GITHUB_TOKEN")
+        token = os.getenv("TOKEN_GITHUB")
         if not token:
-            raise ValueError("GITHUB_TOKEN não encontrado no arquivo .env")
+            raise ValueError("TOKEN_GITHUB não encontrado no arquivo .env")
             
         # Autentica no GitHub
         self.gh = Github(token)
