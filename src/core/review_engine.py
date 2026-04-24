@@ -74,12 +74,9 @@ class ReviewEngine:
             else:
                 # Fallback se o JSON falhar
                 try:
-                    repo = self.git_adapter.gh.get_repo(target_project)
-                    pr = repo.get_pull(merge_request_id)
-                    pr.create_issue_comment(f"⚠️ IA detectou falha de formatação. Resposta bruta:\n\n{review_result}")
-                    print("✅ Fallback enviado como comentário geral.")
+                    print("⚠️ IA detectou falha de formatação na resposta.")
                 except Exception as ex:
-                    print(f"❌ Erro crítico ao postar no GitHub: {str(ex)}")
+                    print(f"❌ Erro crítico ao processar fallback no GitHub: {str(ex)}")
         else:
             # GitLab ainda usa o formato antigo (ajustar depois se necessário)
             self.git_adapter.post_comment_on_mr(target_project, merge_request_id, review_result)
