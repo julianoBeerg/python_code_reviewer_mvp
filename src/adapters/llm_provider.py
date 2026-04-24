@@ -48,9 +48,29 @@ class LLMProvider:
 
     def generate_review(self, diff_data: str, context_data: str) -> str:
         """
-        Constrói o prompt e solicita a revisão ao Gemini com foco em segurança.
+        Tenta gerar a revisão usando uma lista de modelos de fallback.
         """
-        prompt = f"""
+        # Lista de modelos para tentar (do mais moderno para o mais compatível)
+        models_to_try = [
+            self.model_name,
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash-exp",
+            "gemini-pro"
+        ]
+        
+        last_error = ""
+        
+        for model_id in models_to_try:
+            try:
+                print(f"🤖 Tentando revisão com o modelo: {model_id}...")
+                current_model = genai.GenerativeModel(
+                    model_name=model_id,
+                    system_instruction=self.model.system_instruction,
+                    generation_config=self.model.generation_config
+                )
+                
+                prompt = f"""
 Você deve realizar um Code Review focado em SEGURANÇA e BOAS PRÁTICAS.
 
 CONTEXTO DO PROJETO:
@@ -70,26 +90,25 @@ CHECKLIST DE REVISÃO (CRÍTICO):
 4. BUGS: Identifique erros de lógica ou fluxos que podem quebrar em produção.
 
 FORMATO DE RESPOSTA (OBRIGATÓRIO JSON):
-Você deve retornar APENAS um JSON no formato abaixo. Se encontrar qualquer problema de segurança, status deve ser "CHANGES_REQUESTED".
-
 {{
   "summary": "Resumo crítico da revisão",
   "comments": [
     {{
       "file": "nome_do_arquivo.java",
       "line": 10,
-      "text": "🚨 ALERTA DE SEGURANÇA: [Explicação do erro e como corrigir usando variáveis de ambiente ou Vault]"
+      "text": "🚨 ALERTA DE SEGURANÇA: [Explicação]"
     }}
   ],
   "status": "APPROVED" ou "CHANGES_REQUESTED"
 }}
-
-Se o código estiver 100% seguro e seguir os padrões, retorne status "APPROVED" e lista de comments vazia.
-NÃO use blocos de código ```json. Retorne o texto puro.
+APENAS JSON PURO.
 """
-        
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text.strip()
-        except Exception as e:
-            return f"Erro ao gerar revisão pelo Gemini: {str(e)}"
+                response = current_model.generate_content(prompt)
+                return response.text.strip()
+                
+            except Exception as e:
+                last_error = str(e)
+                print(f"⚠️ Falha com {model_id}: {last_error}")
+                continue
+                
+        return f"Erro crítico: Nenhum dos modelos disponíveis ({models_to_try}) funcionou ou tem cota. Último erro: {last_error}"
