@@ -11,6 +11,7 @@ class LLMProvider:
     """
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
+        # Forçando o uso do modelo estável para evitar erro 404
         self.model_name = os.getenv("LLM_MODEL", "gemini-1.5-flash")
         
         if not self.api_key:
