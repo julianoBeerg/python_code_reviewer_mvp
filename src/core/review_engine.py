@@ -34,24 +34,20 @@ class ReviewEngine:
             diff_text = self.git_adapter.get_mr_diff(target_project, merge_request_id)
         
         if not diff_text:
-            print("Não foi possível encontrar mudanças (diff) para esta solicitação.")
+            print("❌ ERRO: O Diff está vazio. Verifique se o ID do PR está correto ou se há mudanças.")
             return
 
+        print(f"📊 Diff carregado com sucesso! Tamanho: {len(diff_text)} caracteres.")
+        
         print("Recuperando contexto das diretrizes e READMEs do projeto via RAG...")
         context_data = self.retriever.search(query=diff_text, top_k=3)
         
         print("Enviando Diff + Contexto para a IA Revisora (Gemini)...")
         review_result = self.llm.generate_review(diff_text, context_data)
         
-        print("Revisão gerada pela IA (Raw):")
-        print("="*40)
-        print(review_result)
-        print("="*40)
-        
         # Limpa o resultado caso a IA tenha colocado blocos de código markdown
         cleaned_result = review_result.strip()
         if cleaned_result.startswith("```"):
-            # Remove as linhas de abertura e fechamento do bloco de código
             lines = cleaned_result.splitlines()
             if lines[0].startswith("```"):
                 lines = lines[1:]
@@ -59,25 +55,31 @@ class ReviewEngine:
                 lines = lines[:-1]
             cleaned_result = "\n".join(lines).strip()
 
+        print("🔍 RESPOSTA DA IA (Limpada):")
+        print("-" * 30)
+        print(cleaned_result)
+        print("-" * 30)
+
         # Tenta parsear o JSON retornado pela IA
         try:
             review_json = json.loads(cleaned_result)
         except Exception as e:
-            print(f"⚠️ Erro ao parsear JSON da IA. Postando como comentário simples. Erro: {str(e)}")
+            print(f"⚠️ Erro ao parsear JSON da IA. Erro: {str(e)}")
             review_json = None
 
-        print(f"Postando resultado no {self.platform.upper()}...")
+        print(f"🚀 Postando resultado no {self.platform.upper()}...")
         if self.platform == "github":
             if review_json:
                 self.git_adapter.post_inline_comments(target_project, merge_request_id, review_json)
             else:
-                # Fallback se o JSON falhar: posta o texto bruto como comentário geral
+                # Fallback se o JSON falhar
                 try:
                     repo = self.git_adapter.gh.get_repo(target_project)
                     pr = repo.get_pull(merge_request_id)
-                    pr.create_issue_comment(f"⚠️ A IA encontrou problemas, mas o formato da resposta falhou:\n\n{review_result}")
+                    pr.create_issue_comment(f"⚠️ IA detectou falha de formatação. Resposta bruta:\n\n{review_result}")
+                    print("✅ Fallback enviado como comentário geral.")
                 except Exception as ex:
-                    print(f"Erro ao postar fallback no GitHub: {str(ex)}")
+                    print(f"❌ Erro crítico ao postar no GitHub: {str(ex)}")
         else:
             # GitLab ainda usa o formato antigo (ajustar depois se necessário)
             self.git_adapter.post_comment_on_mr(target_project, merge_request_id, review_result)

@@ -23,10 +23,16 @@ class LLMProvider:
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
             system_instruction=(
-                "Você é um Auditor de Segurança e Arquiteto de Software Senior. "
-                "Sua missão é impedir que códigos com vulnerabilidades ou falhas de padrão sejam mesclados. "
-                "Seja extremamente rigoroso e crítico."
-            )
+                "Você é um Auditor de Segurança rigoroso. "
+                "Sua única tarefa é encontrar falhas, especialmente Hardcoded Secrets (chaves, senhas) e falhas de lógica. "
+                "NÃO seja complacente. Se houver uma string fixa que parece uma chave, peça mudanças."
+            ),
+            generation_config={
+                "temperature": 0,
+                "top_p": 0.95,
+                "top_k": 64,
+                "max_output_tokens": 8192,
+            }
         )
 
     def generate_review(self, diff_data: str, context_data: str) -> str:
