@@ -10,8 +10,8 @@ class GitHubAdapter:
     """
     def __init__(self):
         token = os.getenv("TOKEN_GITHUB")
-        if not token:
-            raise ValueError("TOKEN_GITHUB não encontrado no arquivo .env")
+        if not token or token.strip() == "":
+            raise ValueError("ERRO: A variável TOKEN_GITHUB está vazia ou não foi configurada nos Secrets do GitHub.")
             
         # Autentica no GitHub
         self.gh = Github(token)
