@@ -38,7 +38,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r reviewer-tool/requirements.txt
 
-      # 5. Executa a Revisão
+      # 5. Diagnóstico de Segredos (Seguro, não mostra o valor)
+      - name: Check Secrets Presence
+        run: |
+          if [ -z "${{ secrets.TOKEN_GITHUB }}" ]; then
+            echo "❌ ERRO: O segredo TOKEN_GITHUB não foi encontrado no GitHub!"
+          else
+            echo "✅ SUCESSO: O segredo TOKEN_GITHUB está presente."
+          fi
+          if [ -z "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "❌ ERRO: O segredo GEMINI_API_KEY não foi encontrado!"
+          fi
+
+      # 6. Executa a Revisão
       - name: Run AI Review
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
