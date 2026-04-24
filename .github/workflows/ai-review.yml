@@ -31,7 +31,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO: ${{ julianoBeerg/poc_java_graphql }}
+          GITHUB_REPO: ${{ github.repository }}
         run: |
           # 1. Indexa as diretrizes (RAG)
           python -m src.cli index --repo .
