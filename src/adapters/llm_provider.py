@@ -20,6 +20,16 @@ class LLMProvider:
         # Configura a API do Google
         genai.configure(api_key=self.api_key)
         
+        # Diagnóstico: Listar modelos disponíveis
+        try:
+            print("--- MODELOS DISPONÍVEIS PARA ESTA CHAVE ---")
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    print(f"ID: {m.name}")
+            print("-------------------------------------------")
+        except Exception as e:
+            print(f"Erro ao listar modelos: {str(e)}")
+
         # Inicializa o modelo com instruções de Auditor de Segurança
         self.model = genai.GenerativeModel(
             model_name=self.model_name,
