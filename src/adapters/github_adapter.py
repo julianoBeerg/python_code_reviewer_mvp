@@ -1,78 +1,49 @@
-import os
 from github import Github
-from dotenv import load_dotenv
-
-load_dotenv()
+from src.config import settings
+from src.utils.logger import logger
 
 class GitHubAdapter:
     """
-    Gerencia a comunicação com a API do GitHub.
+    Handles communication with GitHub API.
     """
     def __init__(self):
-        token = os.getenv("TOKEN_GITHUB")
-        if not token or token.strip() == "":
-            raise ValueError("ERRO: A variável TOKEN_GITHUB está vazia ou não foi configurada nos Secrets do GitHub.")
-            
-        # Autentica no GitHub
-        self.gh = Github(token)
+        if not settings.github_token:
+            logger.error("GITHUB_TOKEN not found in settings")
+            raise ValueError("GITHUB_TOKEN is required")
         
-    def get_pr_diff(self, repo_name: str, pr_number: int) -> str:
-        """
-        Busca as mudanças (diff) de um Pull Request específico.
-        """
-        try:
-            repo = self.gh.get_repo(repo_name)
-            pr = repo.get_pull(pr_number)
-            
-            # O GitHub possui uma forma de pegar os arquivos modificados e seus patchs (diffs)
-            diff_text = ""
-            for file in pr.get_files():
-                diff_text += f"Arquivo modificado: {file.filename}\n"
-                diff_text += f"--- DIFF ---\n{file.patch}\n"
-                diff_text += "="*40 + "\n"
-                
-            return diff_text
-            
-        except Exception as e:
-            print(f"Erro ao buscar Diff do GitHub: {str(e)}")
-            return ""
+        self.gh = Github(settings.github_token)
+        logger.info("Authenticated with GitHub")
 
-    def post_inline_comments(self, repo_name: str, pr_number: int, review_json: dict):
+    def fetch_pull_request_diff(self, repo_name: str, pr_id: int) -> list[dict]:
         """
-        Publica comentários linha a linha no Pull Request.
+        Fetches the diff of a pull request and returns a list of file changes.
         """
         try:
             repo = self.gh.get_repo(repo_name)
-            pr = repo.get_pull(pr_number)
+            pr = repo.get_pull(pr_id)
             
-            # Pega o commit mais recente para associar o comentário
-            last_commit = pr.get_commits().reversed[0]
-            
-            comments = []
-            for comment_data in review_json.get("comments", []):
-                comments.append({
-                    "path": comment_data["file"],
-                    "line": int(comment_data["line"]),
-                    "body": comment_data["text"]
+            diffs = []
+            for file in pr.get_files():
+                diffs.append({
+                    "new_path": file.filename,
+                    "diff": file.patch if file.patch else ""
                 })
             
-            if comments:
-                # Cria uma revisão completa com múltiplos comentários
-                pr.create_review(
-                    commit=last_commit,
-                    body=review_json.get("summary", "AI Code Review"),
-                    event="REQUEST_CHANGES" if review_json.get("status") == "CHANGES_REQUESTED" else "COMMENT",
-                    comments=comments
-                )
-                print(f"✅ Revisão com {len(comments)} comentários inline postada no GitHub!")
-            else:
-                # Apenas aprova se não houver comentários
-                pr.create_review(
-                    commit=last_commit,
-                    body=review_json.get("summary", "Código aprovado pela IA!"),
-                    event="APPROVE"
-                )
-                print(f"✅ PR Aprovado no GitHub!")
-                
+            logger.info(f"Fetched diff for PR #{pr_id} in {repo_name} ({len(diffs)} files)")
+            return diffs
         except Exception as e:
-            print(f"Erro ao publicar comentários inline no GitHub: {str(e)}")
+            logger.error(f"Error fetching PR diff: {e}")
+            raise
+
+    def post_review_comment(self, repo_name: str, pr_id: int, body: str):
+        """
+        Posts a review comment to the pull request.
+        """
+        try:
+            repo = self.gh.get_repo(repo_name)
+            pr = repo.get_pull(pr_id)
+            pr.create_issue_comment(body)
+            logger.info(f"Posted review comment to PR #{pr_id}")
+        except Exception as e:
+            logger.error(f"Error posting comment: {e}")
+            raise

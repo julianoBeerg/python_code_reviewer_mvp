@@ -1,84 +1,66 @@
-import json
-from src.adapters.gitlab_adapter import GitLabAdapter
 from src.adapters.github_adapter import GitHubAdapter
 from src.adapters.llm_provider import LLMProvider
-from src.rag.retriever import VectorRetriever
-import os
+from src.rag.retriever import Retriever
+from src.utils.logger import logger
+from src.config import settings
 
 class ReviewEngine:
-    """
-    Orquestrador principal: Junta Git (GitHub/GitLab), RAG e Gemini para fazer a revisão.
-    """
-    def __init__(self, platform: str = "gitlab"):
-        self.platform = platform.lower()
-        
-        # Inicializa o adapter de Git correto com base na escolha
-        if self.platform == "github":
-            self.git_adapter = GitHubAdapter()
-        else:
-            self.git_adapter = GitLabAdapter()
-            
+    def __init__(self):
+        self.github = GitHubAdapter()
         self.llm = LLMProvider()
-        self.retriever = VectorRetriever()
+        self.retriever = Retriever()
 
-    def run_review(self, target_project: str, merge_request_id: int):
+    def execute_review_flow(self, pr_id: int, repo_name: str = None):
         """
-        Executa o fluxo completo para um Pull/Merge Request.
-        target_project pode ser o ID (GitLab) ou "user/repo" (GitHub).
+        Orchestrates the full review process: fetch diff, retrieve context, generate review, and post comment.
         """
-        print(f"Buscando DIFF da PR/MR #{merge_request_id} no {self.platform.upper()}...")
+        repo_name = repo_name or settings.github_repo
+        if not repo_name:
+            raise ValueError("Repository name is required (pass --repo-name or set GITHUB_REPO in .env)")
+
+        logger.info(f"Starting review flow for PR #{pr_id} in {repo_name}")
         
-        if self.platform == "github":
-            diff_text = self.git_adapter.get_pr_diff(target_project, merge_request_id)
-        else:
-            diff_text = self.git_adapter.get_mr_diff(target_project, merge_request_id)
+        # 1. Fetch Pull Request Diffs
+        changes = self.github.fetch_pull_request_diff(repo_name, pr_id)
+        diff_text = ""
+        for change in changes:
+            diff_text += f"File: {change['new_path']}\nDiff:\n{change['diff']}\n\n"
         
         if not diff_text:
-            print("❌ ERRO: O Diff está vazio. Verifique se o ID do PR está correto ou se há mudanças.")
+            logger.warning("No diff found for this PR.")
             return
 
-        print(f"📊 Diff carregado com sucesso! Tamanho: {len(diff_text)} caracteres.")
+        # 2. Retrieve relevant context (RAG)
+        context = self.retriever.retrieve_context(diff_text[:1000])
+        context_text = "\n\n".join(context)
         
-        print("Recuperando contexto das diretrizes e READMEs do projeto via RAG...")
-        context_data = self.retriever.search(query=diff_text, top_k=3)
+        # 3. Construct Prompt
+        prompt = self._build_prompt(diff_text, context_text)
         
-        print("Enviando Diff + Contexto para a IA Revisora (Gemini)...")
-        review_result = self.llm.generate_review(diff_text, context_data)
+        # 4. Generate Review using LLM
+        review_md = self.llm.generate_review(prompt)
         
-        # Limpa o resultado caso a IA tenha colocado blocos de código markdown
-        cleaned_result = review_result.strip()
-        if cleaned_result.startswith("```"):
-            lines = cleaned_result.splitlines()
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines[-1].startswith("```"):
-                lines = lines[:-1]
-            cleaned_result = "\n".join(lines).strip()
+        # 5. Post Review Comment to GitHub
+        self.github.post_review_comment(repo_name, pr_id, review_md)
+        logger.info("Review flow completed successfully")
 
-        print("🔍 RESPOSTA DA IA (Limpada):")
-        print("-" * 30)
-        print(cleaned_result)
-        print("-" * 30)
+    def _build_prompt(self, diff_text: str, context_text: str) -> str:
+        return f"""
+You are a senior software engineer performing a code review.
+Use the following context from project documentation to guide your review:
+---
+{context_text}
+---
 
-        # Tenta parsear o JSON retornado pela IA
-        try:
-            review_json = json.loads(cleaned_result)
-        except Exception as e:
-            print(f"⚠️ Erro ao parsear JSON da IA. Erro: {str(e)}")
-            review_json = None
+Analyze the following diff and provide a structured review with focus on:
+1. Code quality and best practices.
+2. Potential bugs or edge cases.
+3. Alignment with project documentation provided in the context.
 
-        print(f"🚀 Postando resultado no {self.platform.upper()}...")
-        if self.platform == "github":
-            if review_json:
-                self.git_adapter.post_inline_comments(target_project, merge_request_id, review_json)
-            else:
-                # Fallback se o JSON falhar
-                try:
-                    print("⚠️ IA detectou falha de formatação na resposta.")
-                except Exception as ex:
-                    print(f"❌ Erro crítico ao processar fallback no GitHub: {str(ex)}")
-        else:
-            # GitLab ainda usa o formato antigo (ajustar depois se necessário)
-            self.git_adapter.post_comment_on_mr(target_project, merge_request_id, review_result)
-            
-        print("Fluxo concluído com sucesso!")
+Diff:
+---
+{diff_text}
+---
+
+Provide your review in Markdown format.
+"""

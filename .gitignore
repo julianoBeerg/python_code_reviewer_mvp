@@ -6,8 +6,6 @@ __pycache__/
 env/
 venv/
 ENV/
-
-# Configurações
 .env
 
 # Índice do RAG (Base de Conhecimento Local)

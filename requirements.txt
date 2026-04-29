@@ -1,7 +1,7 @@
-google-genai
-python-gitlab>=4.4.0
-PyGithub>=2.2.0
-python-dotenv>=1.0.0
-click>=8.1.7
-sentence-transformers>=2.5.1
-numpy>=1.26.0
+PyGithub
+google-generativeai
+sentence-transformers
+pydantic-settings
+loguru
+click
+python-dotenv
