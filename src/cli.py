@@ -20,7 +20,7 @@ def review(pr_id, repo_name):
         logger.error(f"Review failed: {e}")
 
 @cli.command()
-@click.option("--repo-path", required=True, help="Path to local repository to index for RAG")
+@click.option("--repo-path", "--repo", required=True, help="Path to local repository to index for RAG")
 def index(repo_path):
     """Index a local repository (markdown files) for RAG"""
     try:
