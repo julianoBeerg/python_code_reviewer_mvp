@@ -9,9 +9,10 @@ def cli():
     pass
 
 @cli.command()
-@click.option("--pr-id", required=True, type=int, help="Pull Request ID")
-@click.option("--repo-name", help="GitHub repository (e.g., 'owner/repo'). Defaults to GITHUB_REPO in .env")
-def review(pr_id, repo_name):
+@click.option("--pr-id", "--mr-id", required=True, type=int, help="Pull Request ID")
+@click.option("--repo-name", "--project-id", help="GitHub repository (e.g., 'owner/repo'). Defaults to GITHUB_REPO in .env")
+@click.option("--platform", help="Legacy option (ignored)")
+def review(pr_id, repo_name, platform=None):
     """Run an AI review on a specific GitHub Pull Request"""
     try:
         engine = ReviewEngine()

@@ -6,6 +6,8 @@ from src.utils.logger import logger
 class VectorStore:
     def __init__(self, index_path=".index/vectors.json"):
         self.index_path = index_path
+        # Ensure parent directory exists
+        os.makedirs(os.path.dirname(self.index_path), exist_ok=True)
         self.data = [] # List of {"text": str, "vector": list}
         self.load()
 
